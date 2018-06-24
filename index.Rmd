@@ -1,0 +1,122 @@
+---
+title: "ESA Climate Sensitivity"
+output: 
+  flexdashboard::flex_dashboard:
+    css: custom.css
+    social: menu
+    df_print: paged
+    navbar:
+    - {title: "CCI", align: right, href: "https://cci-dev.org"}
+    - {title: "", icon: "fa-question-circle fa-lg", align: right, href: "mailto:esa@defenders.org?subject=Five-year reviews app"}
+    - {title: "", icon: "fa-github fa-lg", align: right, href: "https://github.com/Defenders-ESC/"}
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(flexdashboard)
+library(ggplot2)
+library(plotly)
+library(shiny)
+library(viridis)
+
+dat <- readRDS("data_clean.rds")
+sens <- filter(dat, Q_n < 11)
+thrt <- filter(dat, Q_n == 11)
+acts <- filter(dat, Q_n == 12)
+
+taxa <- c("All", unique(dat$Taxon) %>% sort())
+subtaxa <- c("All", unique(dat$Subtaxon) %>% sort())
+region <- c("All", unique(dat$Lead_Region) %>% sort())
+state <- c("All", unlist(dat$state_2) %>% unique() %>% sort())
+
+species <- unique(dat$combo_name) %>% sort()
+
+n_sens_fact <- function(df) {
+  hits <- lapply(species, function(x) {
+    sub <- filter(df, combo_name == x)
+    return(sum(sub$Q_response == "y"))
+  }) %>% unlist()
+  n_sens <- data_frame(species, hits) 
+  res <- left_join(n_sens, thrt, by = c("species" = "combo_name"))
+  return(res)
+}
+
+```
+
+Overview
+=====================================================
+
+Filters {.sidebar}
+-----------------------------------------------------
+### Biodiversity
+
+```{r}
+selectInput(
+  "taxa_1",
+  "Vertebrate?",
+  taxa
+)
+
+selectInput(
+  "taxa_2",
+  "Species group",
+  subtaxa
+)
+```
+
+### Area
+
+```{r}
+selectInput(
+  "region_1",
+  "Region",
+  region
+)
+
+selectInput(
+  "region_2",
+  "State/territory",
+  state
+)
+
+```
+
+Main {data-width=1000}
+-----------------------------------------------------
+
+### Summary
+
+```{r}
+mn_df <- sens
+tally1 <- n_sens_fact(mn_df)
+tab1 <- table(tally1$hits, tally1$Q_response) %>%
+  as_data_frame()
+names(tab1) <- c("n_factors", "threat_disc", "n_species")
+p <- ggplot(tab1, aes(x = n_factors, y = n_species, fill = threat_disc)) + 
+  geom_bar(stat = "identity") +
+  labs(
+    x = "# climate sensitivity factors",
+    y = "# species"
+  ) +
+  scale_fill_viridis(discrete = TRUE) +
+  theme_bw()
+ggplotly(p)
+```
+
+Species
+=====================================================
+
+Filters {.sidebar}
+-----------------------------------------------------
+```{r}
+selectInput(
+  "species_1",
+  "Species",
+  species
+)
+```
+
+Main
+-----------------------------------------------------
+
