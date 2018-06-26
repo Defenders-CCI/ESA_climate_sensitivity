@@ -38,7 +38,8 @@ n_sens_fact <- function(df) {
     return(sum(sub$Q_response == "y"))
   }) %>% unlist()
   n_sens <- data_frame(species, hits) 
-  res <- left_join(n_sens, thrt, by = c("species" = "combo_name"))
+  res <- left_join(n_sens, thrt, by = c("species" = "combo_name")) %>%
+    filter(hits > 0)
   return(res)
 }
 
@@ -79,30 +80,83 @@ selectInput(
   "State/territory",
   state
 )
-
 ```
 
-Main {data-width=1000}
+```{r}
+helpText("Use the drop-downs to filter the data to your species group
+         or area of interest. The chart will automatically update. A
+         warning will show if the combination of filters gives no results.")
+```
+
+Main {data-width=750}
 -----------------------------------------------------
 
 ### Summary
 
 ```{r}
-mn_df <- sens
-tally1 <- n_sens_fact(mn_df)
-tab1 <- table(tally1$hits, tally1$Q_response) %>%
-  as_data_frame()
-names(tab1) <- c("n_factors", "threat_disc", "n_species")
-p <- ggplot(tab1, aes(x = n_factors, y = n_species, fill = threat_disc)) + 
-  geom_bar(stat = "identity") +
-  labs(
-    x = "# climate sensitivity factors",
-    y = "# species"
-  ) +
-  scale_fill_viridis(discrete = TRUE) +
-  theme_bw()
-ggplotly(p)
+usr_sel <- function(df, tx1, tx2, re1, re2) {
+  if(tx1 != "All") {
+    df <- filter(df, Taxon == tx1)
+  }
+  if(tx2 != "All") {
+    df <- filter(df, Subtaxon == tx2)
+  }
+  if(re1 != "All") {
+    df <- filter(df, Lead_Region == re1)
+  }
+  if(re2 != "All") {
+    df <- filter(df, state_2 == re2)
+  }
+  observe(print(head(df)))
+  if(dim(df)[1] == 0) stop("No data match filters; please update selections.")
+  return(df)
+}
+
+tally1 <- reactive({ 
+  cur_dat <- usr_sel(sens, input$taxa_1, input$taxa_2,
+                     input$region_1, input$region_2)
+  t1 <- n_sens_fact(cur_dat)
+  tab1 <- table(t1$hits, t1$Q_response) %>%
+    as_data_frame()
+  names(tab1) <- c("n_factors", "threat_disc", "n_species")
+  return(tab1)
+})
+
+renderPlotly({
+  p <- ggplot(tally1(), aes(x = n_factors, y = n_species, fill = threat_disc)) +
+    geom_bar(stat = "identity") +
+    labs(
+      x = "# climate sensitivity factors",
+      y = "# species",
+      fill = "Threats discussed?"
+    ) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_bw() +
+    theme(legend.position = "none")
+    ggplotly(p) %>%
+      layout(legend = list(orientation = "h"))
+})
 ```
+
+Second {data-width=240}
+-----------------------------------------------------
+**This barchart shows how many species are 'positive' for one of eight climate 
+sensitivity factors.**
+
+<span style='font-weight:bold;background-color:#FDED00;padding:2px'>Yellow</span> 
+is the number of species for which climate threats are discussed.
+
+<span style='font-weight:bold;color:#e9e9e9;background-color:#4E0054;padding:2px'>Purple</span> 
+is the number of species for which climate threats are <span style='font-weight:bold'>NOT</span> discussed.
+
+<hr>
+
+<span style='font-size:smaller'>
+_Interpretation example:_ With no filters applied, the second bar from the left
+shows there are 91 species that score positive for two of the eight climate
+sensitivity questions. Of these, 49 have climate threats discussed and 42 do
+not.
+</span>
 
 Species
 =====================================================
@@ -119,4 +173,13 @@ selectInput(
 
 Main
 -----------------------------------------------------
+```{r}
+cur_sp <- reactive({
+  filter(dat, combo_name == input$species_1)
+})
 
+DT::renderDataTable({
+  tab1 <- select(cur_sp(), Q_n, Q_Text, Q_response)
+  DT::datatable(tab1)
+})
+```
