@@ -20,15 +20,21 @@ library(plotly)
 library(shiny)
 library(viridis)
 
-dat <- readRDS("data_clean.rds")
-sens <- filter(dat, Q_n < 11)
-thrt <- filter(dat, Q_n == 11)
+dat <- readRDS("final_data_2018-11-24.rds")
+# sens <- filter(dat, Q_n < 11)
+sens <- filter(dat, Q_n < 9)
+# thrt <- filter(dat, Q_n == 11)
+
+# TODO: You'll have to create the filters here...I don't understand what is
+# now being done with the 
+thrt <- filter(dat, Sens_Discuss == "y")
+# acts <- filter(dat, Q_n == 12)
 acts <- filter(dat, Q_n == 12)
 
 taxa <- c("All", unique(dat$Taxon) %>% sort())
 subtaxa <- c("All", unique(dat$Subtaxon) %>% sort())
 region <- c("All", unique(dat$Lead_Region) %>% sort())
-state <- c("All", unlist(dat$state_2) %>% unique() %>% sort())
+state <- c("All", unlist(dat$State_ls) %>% unique() %>% sort())
 
 species <- unique(dat$combo_name) %>% sort()
 
@@ -105,9 +111,9 @@ usr_sel <- function(df, tx1, tx2, re1, re2) {
     df <- filter(df, Lead_Region == re1)
   }
   if(re2 != "All") {
-    df <- filter(df, state_2 == re2)
+    df <- filter(df, State_ls == re2)
   }
-  observe(print(head(df)))
+  # observe(print(head(df)))
   if(dim(df)[1] == 0) stop("No data match filters; please update selections.")
   return(df)
 }
@@ -122,7 +128,9 @@ tally1 <- reactive({
   return(tab1)
 })
 
+
 renderPlotly({
+  print(tally1())
   p <- ggplot(tally1(), aes(x = n_factors, y = n_species, fill = threat_disc)) +
     geom_bar(stat = "identity") +
     labs(
