@@ -133,7 +133,6 @@ tally1 <- reactive({
 
 
 renderPlotly({
-  print(tally1())
   p <- ggplot(tally1(), aes(x = n_factors, y = n_species, fill = threat_disc)) +
     geom_bar(stat = "identity") +
     labs(
