@@ -26,7 +26,7 @@ sens <- filter(dat, Q_n < 9)
 # thrt <- filter(dat, Q_n == 11)
 
 # TODO: You'll have to create the filters here...I don't understand what is
-# now being done with the 
+# now being done with the split questions.
 thrt <- filter(dat, Sens_Discuss == "y")
 # acts <- filter(dat, Q_n == 12)
 acts <- filter(dat, Q_n == 12)
