@@ -14,6 +14,7 @@ runtime: shiny
 
 ```{r setup, include=FALSE}
 library(dplyr)
+library(DT)
 library(flexdashboard)
 library(ggplot2)
 library(plotly)
