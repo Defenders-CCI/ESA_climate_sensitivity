@@ -2,57 +2,40 @@
 title: "ESA Climate Sensitivity"
 output: 
   flexdashboard::flex_dashboard:
+    orientation: rows
     css: custom.css
     social: menu
     df_print: paged
     navbar:
-    - {title: "CCI", align: right, href: "https://cci-dev.org"}
+    - {title: "CCI", align: right, href: "https://defenders-cci.org"}
     - {title: "", icon: "fa-question-circle fa-lg", align: right, href: "mailto:adelach@defenders.org?subject=ESA climate sensitivity"}
     - {title: "", icon: "fa-github fa-lg", align: right, href: "https://github.com/Defenders-CCI/"}
 runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-library(dplyr)
 library(DT)
 library(flexdashboard)
-library(ggplot2)
 library(plotly)
 library(shiny)
+library(shinydashboard)
+library(tidyverse)
 library(viridis)
 
-dat <- readRDS("final_data_2018-11-24.rds")
-# sens <- filter(dat, Q_n < 11)  OLD df
-sens <- filter(dat, Q_n < 9)
-
-# TODO: You'll have to create the filter here...I don't understand what is
-# now being done with the split questions.
-# thrt <- filter(dat, Q_n == 11)  # OLD df
-thrt <- filter(dat, Sens_Discuss == "y")  # not sure this is right
-
-# TODO: You'll have to create the filter here...I don't understand what is
-# now being done with the split questions.
-# acts <- filter(dat, Q_n == 12)  # OLD df
-acts <- filter(dat, Q_n == 12)
+dat <- readRDS("data/sensitivity_data_prepped_v2.rds")
+dis <- readRDS("data/discussion_data_prepped_v2.rds")
 
 taxa <- c("All", unique(dat$Taxon) %>% sort())
 subtaxa <- c("All", unique(dat$Subtaxon) %>% sort())
 region <- c("All", unique(dat$Lead_Region) %>% sort())
-state <- c("All", unlist(dat$State_ls) %>% unique() %>% sort())
-
-species <- unique(dat$combo_name) %>% sort()
-
-n_sens_fact <- function(df) {
-  hits <- lapply(species, function(x) {
-    sub <- filter(df, combo_name == x)
-    return(sum(sub$Q_response == "y"))
-  }) %>% unlist()
-  n_sens <- data_frame(species, hits) 
-  res <- left_join(n_sens, thrt, by = c("species" = "combo_name")) %>%
-    filter(hits > 0)
-  return(res)
-}
-
+state <- c("All", 
+           dis$State %>% 
+             str_split(", | |,") %>% 
+             unlist() %>% 
+             str_trim() %>% 
+             unique() %>%
+             sort())
+species <- unique(dat$species) %>% sort()
 ```
 
 Overview
@@ -98,11 +81,8 @@ helpText("Use the drop-downs to filter the data to your species group
          warning will show if the combination of filters gives no results.")
 ```
 
-Main {data-width=750}
+Row 1
 -----------------------------------------------------
-
-### Summary
-
 ```{r}
 usr_sel <- function(df, tx1, tx2, re1, re2) {
   if(tx1 != "All") {
@@ -115,59 +95,114 @@ usr_sel <- function(df, tx1, tx2, re1, re2) {
     df <- filter(df, Lead_Region == re1)
   }
   if(re2 != "All") {
-    df <- filter(df, State_ls == re2)
+    df <- filter(df, grepl(pattern = re2, State))
   }
-  # observe(print(head(df)))
   if(dim(df)[1] == 0) stop("No data match filters; please update selections.")
   return(df)
 }
 
-tally1 <- reactive({ 
-  cur_dat <- usr_sel(sens, input$taxa_1, input$taxa_2,
+dat_select <- reactive({
+  cur_dat <- usr_sel(dat, input$taxa_1, input$taxa_2,
                      input$region_1, input$region_2)
-  t1 <- n_sens_fact(cur_dat)
-  tab1 <- table(t1$hits, t1$Q_response) %>%
-    as_data_frame()
-  names(tab1) <- c("n_factors", "threat_disc", "n_species")
-  return(tab1)
 })
 
+dis_select <- reactive({
+  cur_dat <- usr_sel(dis, input$taxa_1, input$taxa_2,
+                     input$region_1, input$region_2)
+})
 
+```
+
+### Number of Sensitivity Factors
+
+```{r}
 renderPlotly({
-  p <- ggplot(tally1(), aes(x = n_factors, y = n_species, fill = threat_disc)) +
-    geom_bar(stat = "identity") +
-    labs(
-      x = "# climate sensitivity factors",
-      y = "# species",
-      fill = "Threats discussed?"
-    ) +
+  o1 <- dat %>% distinct(Scientific_Name, .keep_all = TRUE)
+  d1 <- dat_select() %>% distinct(Scientific_Name, .keep_all = TRUE)
+  p <- ggplot(data = d1, aes(n_sens_factors)) +
+    geom_bar(data = o1, aes(n_sens_factors), alpha = 0.3) + 
+    geom_bar(alpha = 0.7, fill = viridis(1)) + 
+    labs(x = "# Sensitivity Factors",
+         y = "# Species") +
     scale_fill_viridis(discrete = TRUE) +
     theme_bw() +
     theme(legend.position = "none")
-    ggplotly(p) %>%
-      layout(legend = list(orientation = "h"))
+  ggplotly(p) %>%
+    layout(legend = list(orientation = "h"))
 })
 ```
 
-Second {data-width=240}
+### Climate Change Discussed?
+
+```{r}
+renderPlotly({
+  o1 <- dis
+  d1 <- dis_select()
+  pos <- table(o1$CC_Discuss) %>% sort(decreasing = TRUE) %>% names()
+  p <- ggplot(data = d1, aes(CC_Discuss)) +
+    geom_bar(data = o1, aes(CC_Discuss), alpha = 0.3) + 
+    geom_bar(alpha = 0.7, fill = viridis(1)) + 
+    labs(x = "",
+         y = "# Species") +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_bw() +
+    theme(legend.position = "none")
+  ggplotly(p) %>%
+    layout(legend = list(orientation = "h"))
+})
+```
+
+Row 2
 -----------------------------------------------------
-**This barchart shows how many species are 'positive' for one of eight climate 
-sensitivity factors.**
 
-<span style='font-weight:bold;background-color:#FDED00;padding:2px'>Yellow</span> 
-is the number of species for which climate threats are discussed.
+### Sensitivity Factors
 
-<span style='font-weight:bold;color:#e9e9e9;background-color:#4E0054;padding:2px'>Purple</span> 
-is the number of species for which climate threats are <span style='font-weight:bold'>NOT</span> discussed.
+```{r}
+renderPlotly({
+  o1 <- dat %>% 
+    filter(Sens_Disc == "y")
+  pos <- table(o1$Factor) %>% sort(decreasing = TRUE) %>% names()
+  observe(print(pos))
+  d1 <- dat_select() %>%
+    filter(Sens_Disc == "y")
+  p <- ggplot(data = d1, aes(Factor)) +
+    geom_bar(data = o1, aes(Factor), alpha = 0.3) + 
+    geom_bar(alpha = 0.7, fill = viridis(1)) + 
+    labs(x = "",
+         y = "# Species") +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    scale_x_discrete(limits = pos) +
+    theme(axis.text.x = element_text(angle = 25, hjust = 1))
+  ggplotly(p) %>%
+    layout(legend = list(orientation = "h"))
+})
+```
 
-<hr>
+### Level of Discussion
 
-<span style='font-size:smaller'>
-_Interpretation example:_ With no filters applied, the second bar from the left
-shows there are 91 species that score positive for two of the eight climate
-sensitivity questions. Of these, 49 have climate threats discussed and 42 do
-not.
-</span>
+```{r}
+renderPlotly({
+  o1 <- dis
+  d1 <- dis_select()
+  pos <- table(o1$Discuss_Level) %>% sort(decreasing = TRUE) %>% names()
+  p <- ggplot(data = d1, aes(Discuss_Level)) +
+    geom_bar(data = o1, aes(Discuss_Level), alpha = 0.3) + 
+    geom_bar(alpha = 0.7, fill = viridis(1)) + 
+    labs(x = "",
+         y = "# Species") +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_bw() +
+    scale_x_discrete(limits = pos) +
+    theme(axis.text.x = element_text(angle = 25, hjust = 1)) +
+    theme(legend.position = "none")
+  ggplotly(p) %>%
+    layout(legend = list(orientation = "h"))
+})
+```
+
+
 
 Species
 =====================================================
@@ -175,6 +210,8 @@ Species
 Filters {.sidebar}
 -----------------------------------------------------
 ```{r}
+species <- unique(dat$species) %>% sort()
+
 selectInput(
   "species_1",
   "Species",
@@ -186,11 +223,81 @@ Main
 -----------------------------------------------------
 ```{r}
 cur_sp <- reactive({
-  filter(dat, combo_name == input$species_1)
-})
-
-DT::renderDataTable({
-  tab1 <- select(cur_sp(), Q_n, Q_Text, Q_response)
-  DT::datatable(tab1)
+  filter(dat, species == input$species_1)
 })
 ```
+
+Column 1 {data-width=250}
+-----------------------------------------------------
+
+```{r}
+renderInfoBox({
+  infoBox(
+    cur_sp()$Factor[1],
+    value = if_else(cur_sp()$Sens_Disc[1] == "y", "Yes", "No")
+  )
+})
+
+renderInfoBox({
+  infoBox(
+    cur_sp()$Factor[2],
+    value = if_else(cur_sp()$Sens_Disc[2] == "y", "Yes", "No")
+  )
+})
+
+renderInfoBox({
+  infoBox(
+    cur_sp()$Factor[3],
+    value = if_else(cur_sp()$Sens_Disc[3] == "y", "Yes", "No")
+  )
+})
+
+renderInfoBox({
+  infoBox(
+    cur_sp()$Factor[4],
+    value = if_else(cur_sp()$Sens_Disc[4] == "y", "Yes", "No")
+  )
+})
+```
+
+Row 2 {data-height=250}
+----------------------------------------------------
+
+```{r}
+renderInfoBox({
+  infoBox(
+    cur_sp()$Factor[5],
+    value = if_else(cur_sp()$Sens_Disc[5] == "y", "Yes", "No")
+  )
+})
+
+renderInfoBox({
+  infoBox(
+    cur_sp()$Factor[6],
+    value = if_else(cur_sp()$Sens_Disc[6] == "y", "Yes", "No")
+  )
+})
+
+renderInfoBox({
+  infoBox(
+    cur_sp()$Factor[7],
+    value = if_else(cur_sp()$Sens_Disc[7] == "y", "Yes", "No")
+  )
+})
+
+
+renderInfoBox({
+  infoBox(
+    cur_sp()$Factor[8],
+    value = if_else(cur_sp()$Sens_Disc[8] == "y", "Yes", "No")
+  )
+})
+
+# DT::renderDataTable({
+#   tab1 <- select(cur_sp(), Q_n, Question, Explanation, Sens_Disc)
+#   DT::datatable(tab1)
+# })
+```
+
+Row 3 {data-height=500}
+----------------------------------------------------
