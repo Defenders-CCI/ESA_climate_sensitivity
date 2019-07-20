@@ -2,7 +2,6 @@
 title: "ESA Climate Sensitivity"
 output: 
   flexdashboard::flex_dashboard:
-    orientation: rows
     css: custom.css
     social: menu
     df_print: paged
@@ -14,12 +13,14 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-library(DT)
+library(dplyr)
 library(flexdashboard)
+library(ggplot2)
 library(plotly)
+library(rio)
 library(shiny)
 library(shinydashboard)
-library(tidyverse)
+library(stringr)
 library(viridis)
 
 dat <- readRDS("data/sensitivity_data_prepped_v2.rds")
@@ -76,14 +77,6 @@ selectInput(
 ```
 
 ```{r}
-helpText("Use the drop-downs to filter the data to your species group
-         or area of interest. The chart will automatically update. A
-         warning will show if the combination of filters gives no results.")
-```
-
-Row 1
------------------------------------------------------
-```{r}
 usr_sel <- function(df, tx1, tx2, re1, re2) {
   if(tx1 != "All") {
     df <- filter(df, Taxon == tx1)
@@ -113,191 +106,429 @@ dis_select <- reactive({
 
 ```
 
+```{r}
+helpText("Use the drop-downs to filter the data to your species group
+         or area of interest. The chart will automatically update. A
+         warning will show if the combination of filters gives no results.")
+```
+
+Col 1
+-----------------------------------------------------
+
 ### Number of Sensitivity Factors
 
 ```{r}
+# renderPlotly({
+#   o1 <- dat %>% distinct(Scientific_Name, .keep_all = TRUE)
+#   d1 <- dat_select() %>% distinct(Scientific_Name, .keep_all = TRUE)
+#   p <- ggplot(data = d1, aes(n_sens_factors)) +
+#     geom_bar(data = o1, aes(n_sens_factors), alpha = 0.3) + 
+#     geom_bar(alpha = 0.7, fill = viridis(1)) + 
+#     labs(x = "# Sensitivity Factors",
+#          y = "# Species") +
+#     scale_fill_viridis(discrete = TRUE) +
+#     theme_bw() +
+#     theme(legend.position = "none")
+#   ggplotly(p) %>%
+#     layout(legend = list(orientation = "h"))
+# })
 renderPlotly({
   o1 <- dat %>% distinct(Scientific_Name, .keep_all = TRUE)
   d1 <- dat_select() %>% distinct(Scientific_Name, .keep_all = TRUE)
-  p <- ggplot(data = d1, aes(n_sens_factors)) +
-    geom_bar(data = o1, aes(n_sens_factors), alpha = 0.3) + 
-    geom_bar(alpha = 0.7, fill = viridis(1)) + 
-    labs(x = "# Sensitivity Factors",
-         y = "# Species") +
-    scale_fill_viridis(discrete = TRUE) +
-    theme_bw() +
-    theme(legend.position = "none")
-  ggplotly(p) %>%
-    layout(legend = list(orientation = "h"))
+  plot_ly(
+    data = o1,
+    type = "histogram",
+    x = o1$n_sens_factors,
+    marker = list(color = "rgba(0,0,0,0.2)"),
+    name = "All data"
+  ) %>% 
+    add_histogram(x = d1$n_sens_factors,
+                  marker = list( color = "#6B4577" ),
+                  name = "Selected data") %>%
+    layout(barmode = "overlay",
+           xaxis = list(title = "# Sensitivity Factors"),
+           yaxis = list(title = "# Species"))
 })
 ```
+
+### Distribution Among Sensitivity Factors
+
+```{r}
+renderPlotly({
+  o1 <- dat %>% 
+    filter(Sens_Disc == "y")
+  nsp <- table(o1$Factor) %>% 
+    as.data.frame() %>% 
+    arrange(desc(Freq))
+  sort_levels <- nsp$Var1[order(nsp$Freq, decreasing = TRUE)]
+  nsp$Var1 <- factor(nsp$Var1, levels = sort_levels)
+  d1 <- dat_select() %>%
+    filter(Sens_Disc == "y")
+  # d1 <- filter(dat, Taxon == "Vertebrate") %>%
+  #   filter(Sens_Disc == "y")
+  fnsp <- table(d1$Factor) %>% 
+    as.data.frame()
+  fnsp$Var1 <- factor(fnsp$Var1, levels = sort_levels)
+  plot_ly(
+    data = nsp,
+    type = "bar",
+    x = ~nsp$Var1,
+    y = ~nsp$Freq,
+    marker = list(color = "rgba(0,0,0,0.2)")
+  ) %>%
+    add_bars(
+      data = fnsp,
+      x = ~fnsp$Var1,
+      y = ~fnsp$Freq,
+      marker = list( color = "#6B4577" )
+    ) %>%
+    layout(barmode = "overlay",
+           xaxis = list(title = ""),
+           yaxis = list(title = "# Species"),
+           showlegend = FALSE)
+})
+```
+
+Col 2
+------------------------------------------------------
 
 ### Climate Change Discussed?
 
 ```{r}
 renderPlotly({
   o1 <- dis
+  n_o1 <- table(o1$CC_Discuss) %>% as.data.frame()
   d1 <- dis_select()
-  pos <- table(o1$CC_Discuss) %>% sort(decreasing = TRUE) %>% names()
-  p <- ggplot(data = d1, aes(CC_Discuss)) +
-    geom_bar(data = o1, aes(CC_Discuss), alpha = 0.3) + 
-    geom_bar(alpha = 0.7, fill = viridis(1)) + 
-    labs(x = "",
-         y = "# Species") +
-    scale_fill_viridis(discrete = TRUE) +
-    theme_bw() +
-    theme(legend.position = "none")
-  ggplotly(p) %>%
-    layout(legend = list(orientation = "h"))
+  n_d1 <- table(d1$CC_Discuss) %>% as.data.frame()
+  plot_ly(
+    data = n_o1,
+    type = "bar",
+    x = ~n_o1$Var1,
+    y = ~n_o1$Freq,
+    marker = list(color = "rgba(0,0,0,0.2)")
+  ) %>%
+    add_bars(
+      data = n_d1,
+      x = ~n_d1$Var1,
+      y = ~n_d1$Freq,
+      marker = list( color = "#6B4577" )
+    ) %>%
+    layout(barmode = "overlay",
+           xaxis = list(title = ""),
+           yaxis = list(title = "# Species"),
+           showlegend = FALSE)
 })
 ```
 
-Row 2
------------------------------------------------------
-
-### Sensitivity Factors
+### Level of Climate Change Discussion
 
 ```{r}
 renderPlotly({
-  o1 <- dat %>% 
-    filter(Sens_Disc == "y")
-  pos <- table(o1$Factor) %>% sort(decreasing = TRUE) %>% names()
-  observe(print(pos))
-  d1 <- dat_select() %>%
-    filter(Sens_Disc == "y")
-  p <- ggplot(data = d1, aes(Factor)) +
-    geom_bar(data = o1, aes(Factor), alpha = 0.3) + 
-    geom_bar(alpha = 0.7, fill = viridis(1)) + 
-    labs(x = "",
-         y = "# Species") +
-    scale_fill_viridis(discrete = TRUE) +
-    theme_bw() +
-    theme(legend.position = "none") +
-    scale_x_discrete(limits = pos) +
-    theme(axis.text.x = element_text(angle = 25, hjust = 1))
-  ggplotly(p) %>%
-    layout(legend = list(orientation = "h"))
-})
-```
-
-### Level of Discussion
-
-```{r}
-renderPlotly({
-  o1 <- dis
-  d1 <- dis_select()
-  pos <- table(o1$Discuss_Level) %>% sort(decreasing = TRUE) %>% names()
-  p <- ggplot(data = d1, aes(Discuss_Level)) +
-    geom_bar(data = o1, aes(Discuss_Level), alpha = 0.3) + 
-    geom_bar(alpha = 0.7, fill = viridis(1)) + 
-    labs(x = "",
-         y = "# Species") +
-    scale_fill_viridis(discrete = TRUE) +
-    theme_bw() +
-    scale_x_discrete(limits = pos) +
-    theme(axis.text.x = element_text(angle = 25, hjust = 1)) +
-    theme(legend.position = "none")
-  ggplotly(p) %>%
-    layout(legend = list(orientation = "h"))
+  o2 <- table(dis$Discuss_Level) %>% as.data.frame() %>%
+    arrange(desc(Freq))
+  o2$Var1 <- str_replace(o2$Var1, "\n", "<br>")
+  sort_levels <- o2$Var1[order(o2$Freq, decreasing = TRUE)]
+  o2$Var1 <- factor(o2$Var1, levels = sort_levels)
+  d2 <- table(dis_select()$Discuss_Level) %>% as.data.frame()
+  d2$Var1 <- str_replace(d2$Var1, "\n", "<br>")
+  d2$Var1 <- factor(d2$Var1, levels = sort_levels)
+  b1 <- left_join(o2, d2, by = "Var1")
+  observe({print(b1)})
+  plot_ly(
+    data = b1,
+    type = "bar",
+    x = ~b1$Var1,
+    y = ~b1$Freq.x,
+    marker = list(color = "rgba(0,0,0,0.2)")
+  ) %>%
+    add_bars(
+      data = b1,
+      y = ~b1$Freq.y,
+      marker = list( color = "#6B4577" )
+    ) %>%
+    layout(barmode = "overlay",
+           xaxis = list(title = ""),
+           yaxis = list(title = "# Species"),
+           showlegend = FALSE)
 })
 ```
 
 
-
-Species
+Species {data-orientation=rows}
 =====================================================
 
-Filters {.sidebar}
+Filter {.sidebar}
 -----------------------------------------------------
+
+### Species
+
 ```{r}
 species <- unique(dat$species) %>% sort()
 
 selectInput(
   "species_1",
-  "Species",
+  label = NULL,
   species
 )
 ```
 
-Main
------------------------------------------------------
 ```{r}
 cur_sp <- reactive({
   filter(dat, species == input$species_1)
 })
+
+cur_dis <- reactive({
+  filter(dis, combo_name == input$species_1)
+})
 ```
 
-Column 1 {data-width=250}
+Row 0a
 -----------------------------------------------------
 
+<h1>`r reactive(input$species_1)`</h1>
+
+Row 1
+-----------------------------------------------------
+
+### Taxonomic Group {.value-box}
+
 ```{r}
-renderInfoBox({
-  infoBox(
-    cur_sp()$Factor[1],
-    value = if_else(cur_sp()$Sens_Disc[1] == "y", "Yes", "No")
-  )
-})
-
-renderInfoBox({
-  infoBox(
-    cur_sp()$Factor[2],
-    value = if_else(cur_sp()$Sens_Disc[2] == "y", "Yes", "No")
-  )
-})
-
-renderInfoBox({
-  infoBox(
-    cur_sp()$Factor[3],
-    value = if_else(cur_sp()$Sens_Disc[3] == "y", "Yes", "No")
-  )
-})
-
-renderInfoBox({
-  infoBox(
-    cur_sp()$Factor[4],
-    value = if_else(cur_sp()$Sens_Disc[4] == "y", "Yes", "No")
+# observe({ print(cur_dis()$Subtaxon) })
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = cur_dis()$Subtaxon,
+    color = "info",
+    icon = case_when(
+      cur_dis()$Subtaxon == "Bird" ~ "fa-crow",
+      cur_dis()$Subtaxon == "Fish" ~ "fa-fish",
+      cur_dis()$Subtaxon == "Arthropod" ~ "fa-spider",
+      cur_dis()$Subtaxon == "Amphibian" ~ "fa-frog",
+      cur_dis()$Subtaxon == "Reptile" ~ "fa-hand-lizard",
+      cur_dis()$Subtaxon == "Mammal" ~ "fa-paw",
+      cur_dis()$Subtaxon == "Mollusck" ~ "fa-circle"
+    )
   )
 })
 ```
 
-Row 2 {data-height=250}
-----------------------------------------------------
+### Lead Region {.value-box}
 
 ```{r}
-renderInfoBox({
-  infoBox(
-    cur_sp()$Factor[5],
-    value = if_else(cur_sp()$Sens_Disc[5] == "y", "Yes", "No")
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = cur_dis()$Lead_Region,
+    color = "info",
+    icon = "fa-map"
   )
 })
+```
 
-renderInfoBox({
-  infoBox(
-    cur_sp()$Factor[6],
-    value = if_else(cur_sp()$Sens_Disc[6] == "y", "Yes", "No")
+### Year Discussed {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = cur_dis()$Date,
+    color = "info",
+    icon = "fa-calendar"
   )
 })
+```
 
-renderInfoBox({
-  infoBox(
-    cur_sp()$Factor[7],
-    value = if_else(cur_sp()$Sens_Disc[7] == "y", "Yes", "No")
+Row 1b
+-----------------------------------------------------
+
+<h1>Climate Sensitivities</h1>
+
+Row 2
+-----------------------------------------------------
+
+### `r reactive({cur_sp()$Factor[1] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[1] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[1] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[1] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
+```
 
+### `r reactive({ cur_sp()$Factor[2] })` {.value-box}
 
-renderInfoBox({
-  infoBox(
-    cur_sp()$Factor[8],
-    value = if_else(cur_sp()$Sens_Disc[8] == "y", "Yes", "No")
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[2] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[2] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[2] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
+```
 
+### `r reactive({ cur_sp()$Factor[3] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[3] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[3] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[3] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[4] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[4] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[4] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[4] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+Row 3 
+----------------------------------------------------
+
+### `r reactive({cur_sp()$Factor[5] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[5] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[5] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[5] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[6] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[6] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[6] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[6] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[7] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[7] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[7] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[7] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[8] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[8] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[8] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[8] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+Row 2b
+-----------------------------------------------------
+
+<h1>Climate Discussion</h1>
+
+Row 4
+----------------------------------------------------
+
+### Climate change discussed? {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_dis()$CC_Discuss == "Yes", "Yes", "No"),
+    color = if_else(cur_dis()$CC_Discuss == "Yes", "success", "danger"),
+    icon = if_else(cur_dis()$CC_Discuss == "Yes", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### Level of climate change _action_ discussed {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = cur_dis()$Discuss_Level,
+    color = if_else(
+      cur_dis()$Discuss_Level %in% c("Action", "Further study"), 
+      "success", "danger"),
+    icon = if_else(
+      cur_dis()$Discuss_Level %in% c("Action", "Further study"), 
+      "fa-comment", "fa-times-circle")
+  )
+})
+```
+
+
+
+Data+
+=====================================================
+
+col 1 {data-width:250}
+-----------------------------------------------------
+
+col 2 {data-width=500}
+-----------------------------------------------------
+
+<h4>Downloads</h4>
+
+```{r}
+downloadButtonRmd <- function (outputId, label = "Download", class = NULL, ...)  {
+     tags$a(id = outputId, class = paste("btn btn-default shiny-download-link", 
+        class), href = "", target = "_blank", download = NA, 
+        icon("download"), label, ...)
+}
+
+downloadButtonRmd("downloadSensData", "Download Sensitivity Data")
+
+output$downloadSensData <- downloadHandler(
+    filename = "ESA_climate_sensitvity.xlsx",
+    content = function(file) {
+      export(dat, file)
+    } 
+  )
+```
+
+```{r}
+downloadButtonRmd("downloadDiscData", "Download Discussion Data")
+
+output$downloadDiscData <- downloadHandler(
+    filename = "ESA_climate_sensitvity_discussion.xlsx",
+    content = function(file) {
+      export(dis, file)
+    } 
+  )
+```
+
+<h4>Paper</h4>
+
+A preprint of the paper based on this data can be found on [bioarxiv](https://www.biorxiv.org/content/10.1101/647396v2). We will add a link to the peer-reviewed paper when it is available.
+
+```{r}
 # DT::renderDataTable({
-#   tab1 <- select(cur_sp(), Q_n, Question, Explanation, Sens_Disc)
-#   DT::datatable(tab1)
+#   # tab1 <- select(dat, Question, Explanation, Sens_Disc)
+#   DT::datatable(dat)
 # })
 ```
 
-Row 3 {data-height=500}
-----------------------------------------------------
+col 3 {data-width:250}
+-----------------------------------------------------
