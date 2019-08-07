@@ -1,0 +1,18 @@
+"Data to accompany peer-reviewed article entitled ""Agency plans are inadequate to conserve US endangered species under climate change""",
+,
+"Dataset 1 of 2, containing evaluation of species climate change sensitivity",
+"Structure: eight rows per species, representing the eight climate change sensitivity factors and sources of information",
+,
+Header,Meaning
+Scientific_Name,Scientific name
+Common_Name,Common name
+Taxon,Vertebrate or invertebrate
+Subtaxon,"Taxonomic class: arthropod, amphibian, bird, fish, mammal, mollusk, reptile"
+Lead_Region,Leading agency (US Fish and Wildlife or US National Marine Fisheries Service) and region designated with management and recovery of the species
+State,State(s) in agency region
+Q_n,Sensitivity factor question (see Table 1)
+Question,Sensitivity factor question (see Table 1)
+Explanation,Notes and rationale for sensitivity answer
+Source,Source of information for rating sensitivity
+Factor,Sensitivity factor (see Table 1)
+Sensitive,"Sensitivity score: yes, no or unknown"

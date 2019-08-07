@@ -12,7 +12,7 @@ a {
 }
 
 a:visited {
-  color: white;
+  color: #5C6BC0;
   font-weight: 500;
 }
 
@@ -155,8 +155,7 @@ a:visited {
   flex: none !important;
 }
 
-#section-row-1b > h1,
-#section-row-2b > h1 {
+#section-row-1b > h1 {
   margin-top: 0;
 }
 
@@ -166,10 +165,6 @@ a:visited {
 
 .btn-default {
   border-radius: 5px !important;
-}
-
-#downloadSensMetadata {
-  width: 250px;
 }
 
 /* .dashboard-page-wrapper {
@@ -183,6 +178,6 @@ a:visited {
     }
 } */
 
-#section-col-2-1 >p {
+#section-col-2-1 > p {
   padding-left: 0;
 }

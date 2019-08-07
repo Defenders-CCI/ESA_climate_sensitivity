@@ -26,11 +26,6 @@ library(viridis)
 dat <- readRDS("data/sensitivity_data_prepped_v2.rds")
 dis <- readRDS("data/discussion_data_prepped_v2.rds")
 
-sens_dwnld <- readRDS("data/Delach_et_al_2019_sensitivity_data.rds")
-disc_dwnld <- readRDS("data/Delach_et_al_2019_discussion_data.rds")
-sensmeta <- readRDS("data/sensitivity_metadata.rds")
-dismeta <- readRDS("data/discussion_metadata.rds")
-
 taxa <- c("All", unique(dat$Taxon) %>% sort())
 subtaxa <- c("All", unique(dat$Subtaxon) %>% sort())
 region <- c("All", unique(dat$Lead_Region) %>% sort())
@@ -70,7 +65,7 @@ selectInput(
 ```{r}
 selectInput(
   "region_1",
-  "Agency/region",
+  "Region",
   region
 )
 
@@ -120,7 +115,7 @@ helpText("Use the drop-downs to filter the data to your species group
 Col 1
 -----------------------------------------------------
 
-### Distribution of species sensitivity
+### Number of Sensitivity Factors
 
 ```{r}
 # renderPlotly({
@@ -148,7 +143,7 @@ renderPlotly({
     name = "All data"
   ) %>% 
     add_histogram(x = d1$n_sens_factors,
-                  marker = list( color = "#C41230" ),
+                  marker = list( color = "#6B4577" ),
                   name = "Selected data") %>%
     layout(barmode = "overlay",
            xaxis = list(title = "# Sensitivity Factors"),
@@ -156,7 +151,7 @@ renderPlotly({
 })
 ```
 
-### Distribution among sensitivity factors
+### Distribution Among Sensitivity Factors
 
 ```{r}
 renderPlotly({
@@ -185,7 +180,7 @@ renderPlotly({
       data = fnsp,
       x = ~fnsp$Var1,
       y = ~fnsp$Freq,
-      marker = list( color = "#387C2B" )
+      marker = list( color = "#6B4577" )
     ) %>%
     layout(barmode = "overlay",
            xaxis = list(title = ""),
@@ -197,7 +192,7 @@ renderPlotly({
 Col 2
 ------------------------------------------------------
 
-### Is climate change disussed as a potential threat?
+### Climate Change Discussed?
 
 ```{r}
 renderPlotly({
@@ -216,7 +211,7 @@ renderPlotly({
       data = n_d1,
       x = ~n_d1$Var1,
       y = ~n_d1$Freq,
-      marker = list( color = "#E36F1E" )
+      marker = list( color = "#6B4577" )
     ) %>%
     layout(barmode = "overlay",
            xaxis = list(title = ""),
@@ -225,21 +220,20 @@ renderPlotly({
 })
 ```
 
-### At what level is climate change management discussed?
+### Level of Climate Change Discussion
 
 ```{r}
 renderPlotly({
-  dis1 <- subset(dis, Discuss_Level!="Excluded from analysis") #excluding this category (n=39) 
-  dis1$Discuss_Level <- as.factor(dis1$Discuss_Level)
-  dis1$Discuss_Level <- droplevels(dis1$Discuss_Level)
-  dis1$Discuss_Level <- as.character(dis1$Discuss_Level)
-  o2 <- table(dis1$Discuss_Level) %>% as.data.frame() %>%
+  o2 <- table(dis$Discuss_Level) %>% as.data.frame() %>%
     arrange(desc(Freq))
   o2$Var1 <- str_replace(o2$Var1, "\n", "<br>")
+  observe({ print(levels(factor(o2$Var1))) })
+  # sort_levels <- o2$Var1[order(o2$Freq, decreasing = TRUE)]
+  # o2$Var1 <- factor(o2$Var1, levels = sort_levels)
   d2 <- table(dis_select()$Discuss_Level) %>% as.data.frame()
   d2$Var1 <- str_replace(d2$Var1, "\n", "<br>")
+  # d2$Var1 <- factor(d2$Var1, levels = sort_levels)
   b1 <- left_join(o2, d2, by = "Var1")
-  b1$Var1 <- factor(b1$Var1,levels=c("No discussion","No threat,<br>no action needed","Further study","Action"))
   observe({print(b1)})
   plot_ly(
     data = b1,
@@ -251,7 +245,7 @@ renderPlotly({
     add_bars(
       data = b1,
       y = ~b1$Freq.y,
-      marker = list( color = "#7A3777" ) #6B4577
+      marker = list( color = "#6B4577" )
     ) %>%
     layout(barmode = "overlay",
            xaxis = list(title = ""),
@@ -297,7 +291,7 @@ Row 0a
 Row 1
 -----------------------------------------------------
 
-### Taxonomic group {.value-box}
+### Taxonomic Group {.value-box}
 
 ```{r}
 # observe({ print(cur_dis()$Subtaxon) })
@@ -318,7 +312,7 @@ flexdashboard::renderValueBox({
 })
 ```
 
-### Lead region {.value-box}
+### Lead Region {.value-box}
 
 ```{r}
 flexdashboard::renderValueBox({
@@ -330,7 +324,7 @@ flexdashboard::renderValueBox({
 })
 ```
 
-### Year discussed {.value-box}
+### Year Discussed {.value-box}
 
 ```{r}
 flexdashboard::renderValueBox({
@@ -457,7 +451,7 @@ Row 2b
 Row 4
 ----------------------------------------------------
 
-### Climate change discussed as potential threat? {.value-box}
+### Climate change discussed? {.value-box}
 
 ```{r}
 flexdashboard::renderValueBox({
@@ -469,22 +463,25 @@ flexdashboard::renderValueBox({
 })
 ```
 
-### Level of climate change management discussed {.value-box}
+### Level of climate change _action_ discussed {.value-box}
 
 ```{r}
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = cur_dis()$Discuss_Level,
     color = if_else(
-      cur_dis()$Discuss_Level %in% c("Action"), 
+      cur_dis()$Discuss_Level %in% c("Action", "Further study"), 
       "success", "danger"),
     icon = if_else(
-      cur_dis()$Discuss_Level %in% c("Action"), 
+      cur_dis()$Discuss_Level %in% c("Action", "Further study"), 
       "fa-comment", "fa-times-circle")
   )
 })
 ```
 
+Row 5
+-----------------------------------------------------
+<hr>
 
 
 Data+
@@ -508,52 +505,30 @@ downloadButtonRmd <- function (outputId, label = "Download", class = NULL, ...) 
 downloadButtonRmd("downloadSensData", "Download Sensitivity Data")
 
 output$downloadSensData <- downloadHandler(
-    filename = "Delach_et_al_2019_sensitivity_data.xlsx",
+    filename = "ESA_climate_sensitvity.xlsx",
     content = function(file) {
-      export(sens_dwnld, file)
+      export(dat, file)
     } 
   )
 ```
-```{r}
-downloadButtonRmd("downloadSensMetadata", "Download Sensitivity Metadata")
-
-output$downloadSensMetadata <- downloadHandler(
-    filename = "Delach_et_al_2019_sensitivity_metadata.xlsx",
-    content = function(file) {
-      export(sensmeta, file)
-    } 
-  )
-```
-<h4>
 
 ```{r}
 downloadButtonRmd("downloadDiscData", "Download Discussion Data")
 
 output$downloadDiscData <- downloadHandler(
-    filename = "Delach_et_al_2019_discussion_data.xlsx",
+    filename = "ESA_climate_sensitvity_discussion.xlsx",
     content = function(file) {
-      export(disc_dwnld, file)
+      export(dis, file)
     } 
   )
 ```
 
+<a class='btn btn-default shiny-download-link shiny-bound-output' href='https://www.biorxiv.org/content/10.1101/647396v2' style="width:250px">Access Preprint</a>
 
-```{r}
-downloadButtonRmd("downloadDiscMetadata", "Download Discussion Metadata")
-
-output$downloadDiscMetadata <- downloadHandler(
-    filename = "Delach_et_al_2019_discussion_metadata.xlsx",
-    content = function(file) {
-      export(dismeta, file)
-    } 
-  )
-```
 
 <h4>Paper</h4>
 
-<a class='btn btn-default shiny-download-link shiny-bound-output' href='https://www.biorxiv.org/content/10.1101/647396v2' style="width:250px" target="_blank">Access Preprint</a>
-
-A link to the peer-reviewed paper will be available when it is published. Citation: Delach A, Caldas A, Edson K, Krehbiel R, Murray S, Theoharides K, Vorhees L, Malcom JW, Salvo M, Miller JR. 2019. Agency plans are inadequate to conserve US endangered species under climate change. Under peer-review.
+A preprint of the paper based on this data can be found on [bioarxiv](https://www.biorxiv.org/content/10.1101/647396v2). We will add a link to the peer-reviewed paper when it is available.
 
 ```{r}
 # DT::renderDataTable({
