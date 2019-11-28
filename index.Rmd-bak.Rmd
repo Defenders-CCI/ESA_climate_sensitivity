@@ -1,0 +1,566 @@
+---
+title: "ESA Climate Sensitivity"
+output: 
+  flexdashboard::flex_dashboard:
+    css: custom.css
+    social: menu
+    df_print: paged
+    navbar:
+    - {title: "CCI", align: right, href: "https://defenders-cci.org"}
+    - {title: "", icon: "fa-question-circle fa-lg", align: right, href: "mailto:adelach@defenders.org?subject=ESA climate sensitivity"}
+    - {title: "", icon: "fa-github fa-lg", align: right, href: "https://github.com/Defenders-CCI/"}
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(flexdashboard)
+library(ggplot2)
+library(plotly)
+library(rio)
+library(shiny)
+library(shinydashboard)
+library(stringr)
+library(viridis)
+
+dat <- readRDS("data/sensitivity_data_prepped_v2.rds")
+dis <- readRDS("data/discussion_data_prepped_v2.rds")
+
+sens_dwnld <- readRDS("data/Delach_et_al_2019_sensitivity_data.rds")
+disc_dwnld <- readRDS("data/Delach_et_al_2019_discussion_data.rds")
+sensmeta <- readRDS("data/sensitivity_metadata.rds")
+dismeta <- readRDS("data/discussion_metadata.rds")
+
+taxa <- c("All", unique(dat$Taxon) %>% sort())
+subtaxa <- c("All", unique(dat$Subtaxon) %>% sort())
+region <- c("All", unique(dat$Lead_Region) %>% sort())
+state <- c("All", 
+           dis$State %>% 
+             str_split(", | |,") %>% 
+             unlist() %>% 
+             str_trim() %>% 
+             unique() %>%
+             sort())
+species <- unique(dat$species) %>% sort()
+```
+
+Overview
+=====================================================
+
+Filters {.sidebar}
+-----------------------------------------------------
+### Biodiversity
+
+```{r}
+selectInput(
+  "taxa_1",
+  "Vertebrate?",
+  taxa
+)
+
+selectInput(
+  "taxa_2",
+  "Species group",
+  subtaxa
+)
+```
+
+### Area
+
+```{r}
+selectInput(
+  "region_1",
+  "Agency/region",
+  region
+)
+
+selectInput(
+  "region_2",
+  "State/territory",
+  state
+)
+```
+
+```{r}
+usr_sel <- function(df, tx1, tx2, re1, re2) {
+  if(tx1 != "All") {
+    df <- filter(df, Taxon == tx1)
+  }
+  if(tx2 != "All") {
+    df <- filter(df, Subtaxon == tx2)
+  }
+  if(re1 != "All") {
+    df <- filter(df, Lead_Region == re1)
+  }
+  if(re2 != "All") {
+    df <- filter(df, grepl(pattern = re2, State))
+  }
+  if(dim(df)[1] == 0) stop("No data match filters; please update selections.")
+  return(df)
+}
+
+dat_select <- reactive({
+  cur_dat <- usr_sel(dat, input$taxa_1, input$taxa_2,
+                     input$region_1, input$region_2)
+})
+
+dis_select <- reactive({
+  cur_dat <- usr_sel(dis, input$taxa_1, input$taxa_2,
+                     input$region_1, input$region_2)
+})
+
+```
+
+```{r}
+helpText("Use the drop-downs to filter the data to your species group
+         or area of interest. The chart will automatically update. A
+         warning will show if the combination of filters gives no results.")
+```
+
+Col 1
+-----------------------------------------------------
+
+### Distribution of species sensitivity
+
+```{r}
+# renderPlotly({
+#   o1 <- dat %>% distinct(Scientific_Name, .keep_all = TRUE)
+#   d1 <- dat_select() %>% distinct(Scientific_Name, .keep_all = TRUE)
+#   p <- ggplot(data = d1, aes(n_sens_factors)) +
+#     geom_bar(data = o1, aes(n_sens_factors), alpha = 0.3) + 
+#     geom_bar(alpha = 0.7, fill = viridis(1)) + 
+#     labs(x = "# Sensitivity Factors",
+#          y = "# Species") +
+#     scale_fill_viridis(discrete = TRUE) +
+#     theme_bw() +
+#     theme(legend.position = "none")
+#   ggplotly(p) %>%
+#     layout(legend = list(orientation = "h"))
+# })
+renderPlotly({
+  o1 <- dat %>% distinct(Scientific_Name, .keep_all = TRUE)
+  d1 <- dat_select() %>% distinct(Scientific_Name, .keep_all = TRUE)
+  plot_ly(
+    data = o1,
+    type = "histogram",
+    x = o1$n_sens_factors,
+    marker = list(color = "rgba(0,0,0,0.2)"),
+    name = "All data"
+  ) %>% 
+    add_histogram(x = d1$n_sens_factors,
+                  marker = list( color = "#C41230" ),
+                  name = "Selected data") %>%
+    layout(barmode = "overlay",
+           xaxis = list(title = "# Sensitivity Factors"),
+           yaxis = list(title = "# Species"))
+})
+```
+
+### Distribution among sensitivity factors
+
+```{r}
+renderPlotly({
+  o1 <- dat %>% 
+    filter(Sens_Disc == "y")
+  nsp <- table(o1$Factor) %>% 
+    as.data.frame() %>% 
+    arrange(desc(Freq))
+  sort_levels <- nsp$Var1[order(nsp$Freq, decreasing = TRUE)]
+  nsp$Var1 <- factor(nsp$Var1, levels = sort_levels)
+  d1 <- dat_select() %>%
+    filter(Sens_Disc == "y")
+  # d1 <- filter(dat, Taxon == "Vertebrate") %>%
+  #   filter(Sens_Disc == "y")
+  fnsp <- table(d1$Factor) %>% 
+    as.data.frame()
+  fnsp$Var1 <- factor(fnsp$Var1, levels = sort_levels)
+  plot_ly(
+    data = nsp,
+    type = "bar",
+    x = ~nsp$Var1,
+    y = ~nsp$Freq,
+    marker = list(color = "rgba(0,0,0,0.2)")
+  ) %>%
+    add_bars(
+      data = fnsp,
+      x = ~fnsp$Var1,
+      y = ~fnsp$Freq,
+      marker = list( color = "#387C2B" )
+    ) %>%
+    layout(barmode = "overlay",
+           xaxis = list(title = ""),
+           yaxis = list(title = "# Species"),
+           showlegend = FALSE)
+})
+```
+
+Col 2
+------------------------------------------------------
+
+### Is climate change disussed as a potential threat?
+
+```{r}
+renderPlotly({
+  o1 <- dis
+  n_o1 <- table(o1$CC_Discuss) %>% as.data.frame()
+  d1 <- dis_select()
+  n_d1 <- table(d1$CC_Discuss) %>% as.data.frame()
+  plot_ly(
+    data = n_o1,
+    type = "bar",
+    x = ~n_o1$Var1,
+    y = ~n_o1$Freq,
+    marker = list(color = "rgba(0,0,0,0.2)")
+  ) %>%
+    add_bars(
+      data = n_d1,
+      x = ~n_d1$Var1,
+      y = ~n_d1$Freq,
+      marker = list( color = "#E36F1E" )
+    ) %>%
+    layout(barmode = "overlay",
+           xaxis = list(title = ""),
+           yaxis = list(title = "# Species"),
+           showlegend = FALSE)
+})
+```
+
+### At what level is climate change management discussed?
+
+```{r}
+renderPlotly({
+  dis1 <- subset(dis, Discuss_Level!="Excluded from analysis") #excluding this category (n=39) 
+  dis1$Discuss_Level <- as.factor(dis1$Discuss_Level)
+  dis1$Discuss_Level <- droplevels(dis1$Discuss_Level)
+  dis1$Discuss_Level <- as.character(dis1$Discuss_Level)
+  o2 <- table(dis1$Discuss_Level) %>% as.data.frame() %>%
+    arrange(desc(Freq))
+  o2$Var1 <- str_replace(o2$Var1, "\n", "<br>")
+  d2 <- table(dis_select()$Discuss_Level) %>% as.data.frame()
+  d2$Var1 <- str_replace(d2$Var1, "\n", "<br>")
+  b1 <- left_join(o2, d2, by = "Var1")
+  b1$Var1 <- factor(b1$Var1,levels=c("No discussion","No threat,<br>no action needed","Further study","Action"))
+  observe({print(b1)})
+  plot_ly(
+    data = b1,
+    type = "bar",
+    x = ~b1$Var1,
+    y = ~b1$Freq.x,
+    marker = list(color = "rgba(0,0,0,0.2)")
+  ) %>%
+    add_bars(
+      data = b1,
+      y = ~b1$Freq.y,
+      marker = list( color = "#7A3777" ) #6B4577
+    ) %>%
+    layout(barmode = "overlay",
+           xaxis = list(title = ""),
+           yaxis = list(title = "# Species"),
+           showlegend = FALSE)
+})
+```
+
+
+Species {data-orientation=rows}
+=====================================================
+
+Filter {.sidebar}
+-----------------------------------------------------
+
+### Species
+
+```{r}
+species <- unique(dat$species) %>% sort()
+
+selectInput(
+  "species_1",
+  label = NULL,
+  species
+)
+```
+
+```{r}
+cur_sp <- reactive({
+  filter(dat, species == input$species_1)
+})
+
+cur_dis <- reactive({
+  filter(dis, combo_name == input$species_1)
+})
+```
+
+Row 0a
+-----------------------------------------------------
+
+<h1>`r reactive(input$species_1)`</h1>
+
+Row 1
+-----------------------------------------------------
+
+### Taxonomic group {.value-box}
+
+```{r}
+# observe({ print(cur_dis()$Subtaxon) })
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = cur_dis()$Subtaxon,
+    color = "info",
+    icon = case_when(
+      cur_dis()$Subtaxon == "Bird" ~ "fa-crow",
+      cur_dis()$Subtaxon == "Fish" ~ "fa-fish",
+      cur_dis()$Subtaxon == "Arthropod" ~ "fa-spider",
+      cur_dis()$Subtaxon == "Amphibian" ~ "fa-frog",
+      cur_dis()$Subtaxon == "Reptile" ~ "fa-hand-lizard",
+      cur_dis()$Subtaxon == "Mammal" ~ "fa-paw",
+      cur_dis()$Subtaxon == "Mollusck" ~ "fa-circle"
+    )
+  )
+})
+```
+
+### Lead region {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = cur_dis()$Lead_Region,
+    color = "info",
+    icon = "fa-map"
+  )
+})
+```
+
+### Year discussed {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = cur_dis()$Date,
+    color = "info",
+    icon = "fa-calendar"
+  )
+})
+```
+
+Row 1b
+-----------------------------------------------------
+
+<h1>Climate Sensitivities</h1>
+
+Row 2
+-----------------------------------------------------
+
+### `r reactive({cur_sp()$Factor[1] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[1] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[1] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[1] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[2] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[2] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[2] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[2] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[3] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[3] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[3] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[3] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[4] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[4] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[4] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[4] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+Row 3 
+----------------------------------------------------
+
+### `r reactive({cur_sp()$Factor[5] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[5] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[5] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[5] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[6] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[6] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[6] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[6] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[7] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[7] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[7] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[7] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### `r reactive({ cur_sp()$Factor[8] })` {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_sp()$Sens_Disc[8] == "y", "Yes", "No"),
+    color = if_else(cur_sp()$Sens_Disc[8] == "y", "success", "danger"),
+    icon = if_else(cur_sp()$Sens_Disc[8] == "y", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+Row 2b
+-----------------------------------------------------
+
+<h1>Climate Discussion</h1>
+
+Row 4
+----------------------------------------------------
+
+### Climate change discussed as potential threat? {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = if_else(cur_dis()$CC_Discuss == "Yes", "Yes", "No"),
+    color = if_else(cur_dis()$CC_Discuss == "Yes", "success", "danger"),
+    icon = if_else(cur_dis()$CC_Discuss == "Yes", "fa-check-circle", "fa-times-circle")
+  )
+})
+```
+
+### Level of climate change management discussed {.value-box}
+
+```{r}
+flexdashboard::renderValueBox({
+  flexdashboard::valueBox(
+    value = cur_dis()$Discuss_Level,
+    color = if_else(
+      cur_dis()$Discuss_Level %in% c("Action"), 
+      "success", "danger"),
+    icon = if_else(
+      cur_dis()$Discuss_Level %in% c("Action"), 
+      "fa-comment", "fa-times-circle")
+  )
+})
+```
+
+
+
+Data+
+=====================================================
+
+col 1 {data-width:250}
+-----------------------------------------------------
+
+col 2 {data-width=500}
+-----------------------------------------------------
+
+<h4>Downloads</h4>
+
+```{r}
+downloadButtonRmd <- function (outputId, label = "Download", class = NULL, ...)  {
+     tags$a(id = outputId, class = paste("btn btn-default shiny-download-link", 
+        class), href = "", target = "_blank", download = NA, 
+        icon("download"), label, ...)
+}
+
+downloadButtonRmd("downloadSensData", "Download Sensitivity Data")
+
+output$downloadSensData <- downloadHandler(
+    filename = "Delach_et_al_2019_sensitivity_data.xlsx",
+    content = function(file) {
+      export(sens_dwnld, file)
+    } 
+  )
+```
+```{r}
+downloadButtonRmd("downloadSensMetadata", "Download Sensitivity Metadata")
+
+output$downloadSensMetadata <- downloadHandler(
+    filename = "Delach_et_al_2019_sensitivity_metadata.xlsx",
+    content = function(file) {
+      export(sensmeta, file)
+    } 
+  )
+```
+<h4>
+
+```{r}
+downloadButtonRmd("downloadDiscData", "Download Discussion Data")
+
+output$downloadDiscData <- downloadHandler(
+    filename = "Delach_et_al_2019_discussion_data.xlsx",
+    content = function(file) {
+      export(disc_dwnld, file)
+    } 
+  )
+```
+
+
+```{r}
+downloadButtonRmd("downloadDiscMetadata", "Download Discussion Metadata")
+
+output$downloadDiscMetadata <- downloadHandler(
+    filename = "Delach_et_al_2019_discussion_metadata.xlsx",
+    content = function(file) {
+      export(dismeta, file)
+    } 
+  )
+```
+
+<h4>Paper</h4>
+
+<a class='btn btn-default shiny-download-link shiny-bound-output' href='https://www.biorxiv.org/content/10.1101/647396v2' style="width:250px" target="_blank">Access Preprint</a>
+
+A link to the peer-reviewed paper will be available when it is published. Citation: Delach A, Caldas A, Edson K, Krehbiel R, Murray S, Theoharides K, Vorhees L, Malcom JW, Salvo M, Miller JR. 2019. Agency plans are inadequate to conserve US endangered species under climate change. Under peer-review.
+
+```{r}
+# DT::renderDataTable({
+#   # tab1 <- select(dat, Question, Explanation, Sens_Disc)
+#   DT::datatable(dat)
+# })
+```
+
+col 3 {data-width:250}
+-----------------------------------------------------

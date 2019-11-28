@@ -1,5 +1,5 @@
 ---
-title: "ESA Climate Sensitivity"
+title: "Climate sensitivity and management of endangered animals"
 output: 
   flexdashboard::flex_dashboard:
     css: custom.css
@@ -46,6 +46,7 @@ species <- unique(dat$species) %>% sort()
 
 Overview
 =====================================================
+
 
 Filters {.sidebar}
 -----------------------------------------------------
@@ -111,16 +112,24 @@ dis_select <- reactive({
 
 ```
 
+
 ```{r}
 helpText("Use the drop-downs to filter the data to your species group
-         or area of interest. The chart will automatically update. A
-         warning will show if the combination of filters gives no results.")
+         or area of interest. A warning will show if the combination of 
+         filters gives no results.")
+```
+
+### Background
+```{r}
+helpText("This study examines the sensitivity of U.S. endangered animals 
+         to climate change and at what level agency plans discuss climate 
+         change threats and management. See ",a(href="https://defenders-cci.org/app/ESA_climate/#section-data", target="_blank", "Data+")," for details.")
 ```
 
 Col 1
 -----------------------------------------------------
 
-### Distribution of species sensitivity
+### Degree of climate sensitivity
 
 ```{r}
 # renderPlotly({
@@ -156,7 +165,7 @@ renderPlotly({
 })
 ```
 
-### Distribution among sensitivity factors
+### Ranking of climate sensitivity threats
 
 ```{r}
 renderPlotly({
@@ -356,7 +365,7 @@ Row 2
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = if_else(cur_sp()$Sens_Disc[1] == "y", "Yes", "No"),
-    color = if_else(cur_sp()$Sens_Disc[1] == "y", "success", "danger"),
+    color = if_else(cur_sp()$Sens_Disc[1] == "y", "danger", "success"),
     icon = if_else(cur_sp()$Sens_Disc[1] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
@@ -368,7 +377,7 @@ flexdashboard::renderValueBox({
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = if_else(cur_sp()$Sens_Disc[2] == "y", "Yes", "No"),
-    color = if_else(cur_sp()$Sens_Disc[2] == "y", "success", "danger"),
+    color = if_else(cur_sp()$Sens_Disc[2] == "y", "danger", "success"),
     icon = if_else(cur_sp()$Sens_Disc[2] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
@@ -380,7 +389,7 @@ flexdashboard::renderValueBox({
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = if_else(cur_sp()$Sens_Disc[3] == "y", "Yes", "No"),
-    color = if_else(cur_sp()$Sens_Disc[3] == "y", "success", "danger"),
+    color = if_else(cur_sp()$Sens_Disc[3] == "y", "danger", "success"),
     icon = if_else(cur_sp()$Sens_Disc[3] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
@@ -392,7 +401,7 @@ flexdashboard::renderValueBox({
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = if_else(cur_sp()$Sens_Disc[4] == "y", "Yes", "No"),
-    color = if_else(cur_sp()$Sens_Disc[4] == "y", "success", "danger"),
+    color = if_else(cur_sp()$Sens_Disc[4] == "y", "danger", "success"),
     icon = if_else(cur_sp()$Sens_Disc[4] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
@@ -407,7 +416,7 @@ Row 3
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = if_else(cur_sp()$Sens_Disc[5] == "y", "Yes", "No"),
-    color = if_else(cur_sp()$Sens_Disc[5] == "y", "success", "danger"),
+    color = if_else(cur_sp()$Sens_Disc[5] == "y", "danger", "success"),
     icon = if_else(cur_sp()$Sens_Disc[5] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
@@ -419,7 +428,7 @@ flexdashboard::renderValueBox({
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = if_else(cur_sp()$Sens_Disc[6] == "y", "Yes", "No"),
-    color = if_else(cur_sp()$Sens_Disc[6] == "y", "success", "danger"),
+    color = if_else(cur_sp()$Sens_Disc[6] == "y", "danger", "success"),
     icon = if_else(cur_sp()$Sens_Disc[6] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
@@ -431,7 +440,7 @@ flexdashboard::renderValueBox({
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = if_else(cur_sp()$Sens_Disc[7] == "y", "Yes", "No"),
-    color = if_else(cur_sp()$Sens_Disc[7] == "y", "success", "danger"),
+    color = if_else(cur_sp()$Sens_Disc[7] == "y", "danger", "success"),
     icon = if_else(cur_sp()$Sens_Disc[7] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
@@ -443,7 +452,7 @@ flexdashboard::renderValueBox({
 flexdashboard::renderValueBox({
   flexdashboard::valueBox(
     value = if_else(cur_sp()$Sens_Disc[8] == "y", "Yes", "No"),
-    color = if_else(cur_sp()$Sens_Disc[8] == "y", "success", "danger"),
+    color = if_else(cur_sp()$Sens_Disc[8] == "y", "danger", "success"),
     icon = if_else(cur_sp()$Sens_Disc[8] == "y", "fa-check-circle", "fa-times-circle")
   )
 })
@@ -496,64 +505,19 @@ col 1 {data-width:250}
 col 2 {data-width=500}
 -----------------------------------------------------
 
-<h4>Downloads</h4>
+<h4>Data files</h4>
 
-```{r}
-downloadButtonRmd <- function (outputId, label = "Download", class = NULL, ...)  {
-     tags$a(id = outputId, class = paste("btn btn-default shiny-download-link", 
-        class), href = "", target = "_blank", download = NA, 
-        icon("download"), label, ...)
-}
+<a class='btn btn-default shiny-download-link shiny-bound-output' href='https://osf.io/r9uca/' style="width:250px" target="_blank">Access data files</a>
 
-downloadButtonRmd("downloadSensData", "Download Sensitivity Data")
-
-output$downloadSensData <- downloadHandler(
-    filename = "Delach_et_al_2019_sensitivity_data.xlsx",
-    content = function(file) {
-      export(sens_dwnld, file)
-    } 
-  )
-```
-```{r}
-downloadButtonRmd("downloadSensMetadata", "Download Sensitivity Metadata")
-
-output$downloadSensMetadata <- downloadHandler(
-    filename = "Delach_et_al_2019_sensitivity_metadata.xlsx",
-    content = function(file) {
-      export(sensmeta, file)
-    } 
-  )
-```
-<h4>
-
-```{r}
-downloadButtonRmd("downloadDiscData", "Download Discussion Data")
-
-output$downloadDiscData <- downloadHandler(
-    filename = "Delach_et_al_2019_discussion_data.xlsx",
-    content = function(file) {
-      export(disc_dwnld, file)
-    } 
-  )
-```
+Data and R script files are archived on Open Science Framework.
 
 
-```{r}
-downloadButtonRmd("downloadDiscMetadata", "Download Discussion Metadata")
-
-output$downloadDiscMetadata <- downloadHandler(
-    filename = "Delach_et_al_2019_discussion_metadata.xlsx",
-    content = function(file) {
-      export(dismeta, file)
-    } 
-  )
-```
 
 <h4>Paper</h4>
 
-<a class='btn btn-default shiny-download-link shiny-bound-output' href='https://www.biorxiv.org/content/10.1101/647396v2' style="width:250px" target="_blank">Access Preprint</a>
+<a class='btn btn-default shiny-download-link shiny-bound-output' href='https://www.nature.com/articles/s41558-019-0620-8' style="width:250px" target="_blank">Access paper</a>
 
-A link to the peer-reviewed paper will be available when it is published. Citation: Delach A, Caldas A, Edson K, Krehbiel R, Murray S, Theoharides K, Vorhees L, Malcom JW, Salvo M, Miller JR. 2019. Agency plans are inadequate to conserve US endangered species under climate change. Under peer-review.
+Citation: Delach A, Caldas A, Edson K, Krehbiel R, Murray S, Theoharides K, Vorhees L, Malcom JW, Salvo M, Miller JRB. 2019. Agency plans are inadequate to conserve US endangered species under climate change. Nature Climate Change. doi: 10.1038/s41558-019-0620-8.
 
 ```{r}
 # DT::renderDataTable({
